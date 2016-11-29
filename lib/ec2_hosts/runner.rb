@@ -10,6 +10,10 @@ module Ec2Hosts
         raise ArgumentError.new("Cannot specify 'clear' and 'vpc' at the same time.")
       end
 
+      if @options[:tags] && @options[:template]
+        raise ArgumentError.new("Cannot specify 'tags' and 'template' at the same time.")
+      end
+
       updater = Updater.new(@options)
 
       if @options[:clear]

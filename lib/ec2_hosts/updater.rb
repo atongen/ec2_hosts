@@ -2,7 +2,7 @@ module Ec2Hosts
   # Updater implements a simple state machine which is used to update
   # content between zero or more blocks of content which start and end
   # with pre-defined "marker" lines.
-  module Updater
+  class Updater
 
     module Marker
       BEFORE = 0
@@ -10,36 +10,40 @@ module Ec2Hosts
       AFTER = 2
     end
 
-    def self.update(new_hosts, project, file, backup_file, dry_run, delete)
-      start_marker = get_start_marker(project)
-      end_marker = get_end_marker(project)
+    attr_reader :options
 
-      old_hosts = File.read(file)
+    def initialize(options = {})
+      @options = options
+    end
+
+    def update(new_hosts)
+      old_hosts = File.read(options[:file])
 
       if old_hosts.include?(start_marker) && old_hosts.include?(end_marker)
         # valid markers exists
-        if delete
-          new_content = delete_project_hosts(old_hosts, start_marker, end_marker)
+        if options[:delete]
+          new_content = delete_vpc_hosts(old_hosts)
         else
-          new_content = gen_new_hosts(old_hosts, new_hosts, start_marker, end_marker)
+          new_content = gen_new_hosts(old_hosts, new_hosts)
         end
+
         # remove zero or more white space characters at end of file with
         # a single new-line
         new_content.gsub!(/\s+$/, "\n")
 
-        if dry_run
+        if options[:dry_run]
           puts new_content
         elsif new_content != old_hosts
           # backup old host file
-          File.open(backup_file, 'w') { |f| f << old_hosts }
+          File.open(options[:backup], 'w') { |f| f << old_hosts }
           # write new content
-          File.open(file, 'w') { |f| f << new_content }
+          File.open(options[:file], 'w') { |f| f << new_content }
         end
       elsif old_hosts.include?(start_marker) || old_hosts.include?(end_marker)
         raise UpdaterError.new("Invalid marker present in existing hosts content")
       else
         # marker doesn't exist
-        if delete
+        if options[:delete]
           new_content = old_hosts
         else
           new_content = [old_hosts, start_marker, new_hosts, end_marker].join("\n")
@@ -48,11 +52,11 @@ module Ec2Hosts
         # a single new-line
         new_content.gsub!(/\s+$/, "\n")
 
-        if dry_run
+        if options[:dry_run]
           puts new_content
         elsif new_content != old_hosts
           # backup old host file
-          File.open(backup_file, 'w') { |f| f << old_hosts }
+          File.open(options[:backup], 'w') { |f| f << old_hosts }
           # write new content
           File.open(file, 'w') { |f| f << new_content }
         end
@@ -61,7 +65,35 @@ module Ec2Hosts
       true
     end
 
-    def self.gen_new_hosts(hosts, new_hosts, start_marker, end_marker)
+    def clear
+      old_hosts = File.read(options[:file])
+      new_content = old_hosts.dup
+
+      markers = old_hosts.each_line.map do |line|
+        regex = "\# (START|END) EC2 HOSTS - (.+) \#"
+        if m = line.match(/^#{regex}$/)
+          m[2]
+        end
+      end.compact.uniq
+
+      markers.each do |project|
+        new_content = delete_vpc_hosts(new_content)
+      end
+      new_content.gsub!(/\s+$/, "\n")
+
+      if options[:dry_run]
+        puts new_content
+      elsif new_content != old_hosts
+        # backup old host file
+        File.open(options[:file], 'w') { |f| f << old_hosts }
+        # write new content
+        File.open(options[:file], 'w') { |f| f << new_content }
+      end
+    end
+
+  private
+
+    def gen_new_hosts(hosts, new_hosts)
       new_content = ''
       marker_state = Marker::BEFORE
       hosts.split("\n").each do |line|
@@ -98,36 +130,7 @@ module Ec2Hosts
       new_content
     end
 
-    def self.clear(file, backup_file, dry_run)
-      old_hosts = File.read(file)
-      new_content = old_hosts.dup
-
-      markers = old_hosts.each_line.map do |line|
-        regex = "\# (START|END) EC2 HOSTS - (.+) \#"
-        if m = line.match(/^#{regex}$/)
-          m[2]
-        end
-      end.compact.uniq
-
-      markers.each do |project|
-        start_marker = get_start_marker(project)
-        end_marker = get_end_marker(project)
-
-        new_content = delete_project_hosts(new_content, start_marker, end_marker)
-      end
-      new_content.gsub!(/\s+$/, "\n")
-
-      if dry_run
-        puts new_content
-      elsif new_content != old_hosts
-        # backup old host file
-        File.open(backup_file, 'w') { |f| f << old_hosts }
-        # write new content
-        File.open(file, 'w') { |f| f << new_content }
-      end
-    end
-
-    def self.delete_project_hosts(hosts, start_marker, end_marker)
+    def delete_vpc_hosts(hosts)
       new_content = ''
       marker_state = Marker::BEFORE
       hosts.split("\n").each do |line|
@@ -157,12 +160,16 @@ module Ec2Hosts
       new_content
     end
 
-    def self.get_start_marker(project)
-      "# START EC2 HOSTS - #{project} #"
+    def start_marker
+      @start_marker ||= begin
+        "# START EC2 HOSTS - #{options[:vpc]} #"
+      end
     end
 
-    def self.get_end_marker(project)
-      "# END EC2 HOSTS - #{project} #"
+    def end_marker
+      @end_marker ||= begin
+        "# END EC2 HOSTS - #{options[:vpc]} #"
+      end
     end
 
   end

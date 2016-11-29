@@ -1,3 +1,5 @@
+require 'aws-sdk-v1'
+
 require 'ec2_hosts/version'
 require 'ec2_hosts/options'
 require 'ec2_hosts/hosts'

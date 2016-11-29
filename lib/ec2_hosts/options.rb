@@ -8,7 +8,8 @@ module Ec2Hosts
     def initialize(args)
       @options = {
         vpc: nil,
-        template: nil
+        tags: nil,
+        template: nil,
         public: nil,
         exclude_public: false,
         file: '/etc/hosts',
@@ -18,6 +19,10 @@ module Ec2Hosts
         clear: false
       }
       parser.parse!(args)
+
+      if @options[:backup].nil?
+        @options[:backup] = "#{@options[:file]}.bak"
+      end
     end
 
     private
@@ -29,7 +34,10 @@ module Ec2Hosts
           opts.on('-v', '--vpc VPC_NAME', "Name of VPC to use. Defaults to nil.") do |opt|
             @options[:vpc] = opt
           end
-          opts.on('-t', '--template TEMPLATE', "Template string to use to convert instance tags to hostname. Defaults to nil.") do |opt|
+          opts.on('--tags TAGS', "CSV of tag names used to build host name. Defaults to nil.") do |opt|
+            @options[:tags] = opt
+          end
+          opts.on('--template TEMPLATE', "Template string to build hostname from instance tags. Defaults to nil.") do |opt|
             @options[:template] = opt
           end
           opts.on('-p', '--public PUBLIC', "Pattern to match for public/bastion hosts. Use public IP for these. Defaults to nil") do |opt|
