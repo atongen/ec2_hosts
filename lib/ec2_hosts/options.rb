@@ -10,6 +10,8 @@ module Ec2Hosts
         vpc: nil,
         tags: nil,
         template: nil,
+        ignore_missing: true,
+        only_running: true,
         public: nil,
         exclude_public: false,
         file: '/etc/hosts',
@@ -39,6 +41,12 @@ module Ec2Hosts
           end
           opts.on('--template TEMPLATE', "Template string to build hostname from instance tags. Defaults to nil.") do |opt|
             @options[:template] = opt
+          end
+          opts.on('-i', '--[no-]ignore-missing', "Ignore hosts with no matching tags, or invalid template. Defaults to true.") do |opt|
+            @options[:ignore_missing] = opt
+          end
+          opts.on('-r', '--[no-]only-running', "Only list running instances. Defaults to true.") do |opt|
+            @options[:only_running] = opt
           end
           opts.on('-p', '--public PUBLIC', "Pattern to match for public/bastion hosts. Use public IP for these. Defaults to nil") do |opt|
             @options[:public] = opt

@@ -16,6 +16,8 @@ module Ec2Hosts
     end
 
     def vpc
+      return @vpc if instance_variable_defined?(:@vpc)
+
       vpcs = ec2.vpcs.filter("tag:Name", options[:vpc]).map {|v|v}
 
       if vpcs.length > 1
@@ -24,11 +26,17 @@ module Ec2Hosts
         raise ArgumentError.new("VPC '#{options[:vpc]}' not found.")
       end
 
-      vpcs.first
+      @vpc = vpcs.first
     end
 
     def instances
-      vpc.instances.filter("instance-state-name", "running")
+      return @instances if instance_variable_defined?(:@instances)
+
+      if options[:only_running]
+        @instances = vpc.instances.filter("instance-state-name", "running")
+      else
+        @instances = vpc.instances
+      end
     end
 
     def to_a
@@ -39,12 +47,15 @@ module Ec2Hosts
         elsif @processed_template
           hostname = parse_template_hostname(@processed_template, inst.tags.map.to_a.to_h)
         end
-        if hostname.to_s.strip == ""
+
+        if hostname == "" && !options[:ignore_missing]
           hostname = inst.private_dns_name.split('.').first
-        else
-          hostname.gsub!("_", "-")
         end
-        memo[hostname] = inst
+
+        if hostname != ""
+          memo[hostname] = inst
+        end
+
         memo
       end.sort.to_h
 
@@ -52,7 +63,7 @@ module Ec2Hosts
 
       raw.each do |hostname, inst|
         begin
-          if options[:public].to_s.strip != "" && hostname.downcase.include?(options[:public])
+          if !options[:public].nil? && hostname.downcase.include?(options[:public])
             if !options[:exclude_public]
               # get public ip address
               if ip = inst.public_ip_address
@@ -94,9 +105,9 @@ module Ec2Hosts
         end
       end
       if result.any? { |r| r.nil? }
-        nil
+        ""
       else
-        result.join
+        result.join.gsub('_', '-')
       end
     end
 
@@ -107,8 +118,7 @@ module Ec2Hosts
     def parse_tags_hostname(tags, instance_tags)
       tags.map do |tag|
         instance_tags[tag]
-      end.compact
-        .join("-")
+      end.compact.join("-").gsub('_', '-')
     end
   end
 end
