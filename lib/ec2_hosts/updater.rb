@@ -46,7 +46,7 @@ module Ec2Hosts
         if options[:delete]
           new_content = old_hosts
         else
-          new_content = [old_hosts, start_marker, new_hosts, end_marker].join("\n")
+          new_content = [old_hosts, start_marker, new_hosts, end_marker].flatten.join("\n")
         end
         # remove one or more white space characters at end of file with
         # a single new-line
@@ -103,7 +103,7 @@ module Ec2Hosts
             new_content << start_marker + "\n"
             marker_state = Marker::INSIDE
             # add new host content
-            new_hosts.split("\n").each do |host|
+            new_hosts.each do |host|
               new_content << host + "\n"
             end
           else
