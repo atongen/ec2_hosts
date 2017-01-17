@@ -58,7 +58,7 @@ module Ec2Hosts
           # backup old host file
           File.open(options[:backup], 'w') { |f| f << old_hosts }
           # write new content
-          File.open(file, 'w') { |f| f << new_content }
+          File.open(options[:file], 'w') { |f| f << new_content }
         end
       end
 

@@ -41,12 +41,16 @@ module Ec2Hosts
 
     def to_a
       raw = instances.inject({}) do |memo, inst|
-        hostname = nil
+        hostname = ""
         if @processed_tags
           hostname = parse_tags_hostname(@processed_tags, inst.tags.map.to_a.to_h)
         elsif @processed_template
           hostname = parse_template_hostname(@processed_template, inst.tags.map.to_a.to_h)
+        else
+          hostname = inst.tags["Name"]
         end
+
+        hostname = "" unless hostname_valid?(hostname)
 
         if hostname == "" && !options[:ignore_missing]
           hostname = inst.private_dns_name.split('.').first
@@ -119,6 +123,10 @@ module Ec2Hosts
       tags.map do |tag|
         instance_tags[tag]
       end.compact.join("-").gsub('_', '-')
+    end
+
+    def hostname_valid?(hostname)
+      !!hostname.to_s.match(/\A[A-Za-z]+[0-9A-Za-z-]*\Z/)
     end
   end
 end
